@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<div> <svg width="1400" height="800"></svg> </div>
+<script src="https://d3js.org/d3.v5.min.js"></script>
+<script src="https://d3js.org/d3-ease.v1.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.18.1/highlight.min.js"></script>
+<!-- <script>hljs.getLanguage('javascript').k += ['left', 1];</script> -->
+<script src="Colors.js"></script>
+<script src="Circle.js"></script>
+<script src="Link.js"></script>
+<script src="cText.js"></script>
+<script src="cArray.js"></script>
+<script src="BST.js"></script>
+<script src="cButton.js"></script>
+<script src="DataHandler.js"></script>
+<script src="Logger.js"></script>
+<script src="LevelData.js"></script>
+<script src="Camera.js"></script>
+<script src="TextArea.js"></script>
+<script src="RedBlackBST.js"></script>
+
+<audio src="res/sounds/Idyllic.mp3" id="backgroundMusic" loop></audio>
+<audio src="res/sounds/levelComplete.mp3" id="levelCompleteSound"></audio>
+<audio src="res/sounds/select.mp3" id="selectSound"></audio>
+<link rel="stylesheet" href="/styles/atom-one-light.css">
+<script>
+  //START: Init 
+  //Create canvas and d3js simulations
+  
+  var convertInputToCode = (str) => {
+
+    str = str.replace(/insert/g, "callback"); //change the recurisve function call to callback instead
+    
+    // replace all "root.(left/right) = node" with proper syntax for tree
+    var regex = /([a-zA-Z]*).(left|right)\s*=\s*([a-zA-Z]*)/g
+    var match = regex.exec(str);
+    
+    // find all root.left = node / root.right = node
+    while (match) {
+      var i = match[2] == "left" ? 0 : 1 
+      str = str.replace(match[0], "temp.addChild(" + match[3] + "," + match[1] + ", " + i + ")");
+      match = regex.exec(str);
+    }
+
+    regex = /([a-zA-Z]*).(left|right)/g
+    match = regex.exec(str);
+    while (match) {
+      var i = match[2] == "left" ? 0 : 1 
+      str = str.replace(match[0], match[1] + "." + "children[" + i + "]");
+      match = regex.exec(str);
+    }
+
+    var all = 
+    "var insert_custom = function(node, root, callback) {" + 
+    "if (temp.root.isPlaceholder) { temp.root = node; node.locked_to_tree = temp; return;}" + 
+    str + 
+    "}\n" + 
+    "new Promise(resolve  => { return resolve(insert_custom(node, root, (n, r) => temp.insertWithCustomCode(n, r))); })"
+    
+    return all;
+  }
+
+  var clickedExecuteCode = () => {
+    var textarea = d3.selectAll(".textarea").data()[0]
+    
+    user_code = textarea.getText()
+
+
+    insert_method = convertInputToCode(user_code)
+
+    dataHandler.restartLevel();
+
+    var bst = dataHandler.getAllFiguresOfClass("BST")[0]
+    dataHandler.isSuccess(bst.root, bst);
+  }
+
+  var changeTextArea = (t) => {
+    console.log(t)
+  }
+  
+  var redraw = function() {
+    console.log(window.innerHeight)
+    var width = window.innerWidth;
+    var height = window.innerHeight;
+    svg.attr("width", width * 0.8)
+       .attr("height", height - 4)
+  }
+  window.addEventListener("resize", redraw);
+
+  d3.select("div").style("margin", "0")
+const svg = d3.select("svg").style("position", "absolute");
+
+svg.append("filter")
+        .attr("id", "blur")
+      .append("feGaussianBlur")
+        .attr("stdDeviation", 5);
+
+var width = window.innerWidth * 0.8;
+var height = window.innerHeight;
+svg.attr("width", width)
+    .attr("height", height - 4)
+  
+
+
+var defaultRadius = 40;
+var nodes = [];
+var transition_on = false;
+
+const simulation = d3.forceSimulation(nodes)
+    .force("charge", d3.forceManyBody().strength(function(d) {
+      //if (d.locked_to_tree) return 0;
+      if (d.isPlaceholder) return 0;
+      return defaultRadius * -10;
+    }).distanceMin(10))
+
+    .force("x", d3.forceX().x(function(d) {
+    return d.cx}).strength(0.1))
+    .force("y", d3.forceY().y(function(d) {
+    return d.cy}).strength(0.1))  
+    .force("link", d3.forceLink(links).id(function(d) {return d.id; }).distance(10).strength(1)) 
+    .force("collision", d3.forceCollide().radius(function(d) { 
+      if (d === dragged_node) return 0;
+      if (d.isPlaceholder) return 0;
+      else return defaultRadius;
+    }))
+    .alphaTarget(0.6)
+    .on("tick", ticked);
+    
+var g = svg.append("g").attr("transform", "translate(" + width / 2 + "," + height / 2 + ")")
+var node;
+var texts = g.append("div").selectAll(".text");
+var links;
+var array_cells;
+var dragged_node;
+var camera = new Camera();
+//END: Init
+
+
+var zoom = d3.zoom()
+      .extent([[0, 0], [width, height]])
+      .scaleExtent([0.3, 3])
+      .on("zoom", zoomed)
+
+
+var g = svg.append("g").attr("class", "everything");
+
+// START: create initial data
+
+
+const dataHandler = new DataHandler();
+dataHandler.level_state = 14;
+
+setTimeout(() => {
+dataHandler.createData();
+}, 100)
+
+
+/*
+var arr_button = new cButton("Array", 50, height * 0.96, makeArray);
+var cir_button = new cButton("Circle", 150, height * 0.96, makeCircle);
+var bst_button = new cButton("BST", 250, height * 0.96, makeBST);
+
+
+dataHandler.drawableList.push(arr_button)
+dataHandler.drawableList.push(cir_button)
+dataHandler.drawableList.push(bst_button) */
+
+//var operations = new cText(() => { return "Operations: " + op }, 50, height * 0.9)
+//dataHandler.drawableList.push(operations)
+
+
+// END: create initial data
+
+var link_to_be_added;
+
+//START: events
+d3.select("body").on('keydown', function() {
+  if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key==="z") {
+    nodes.forEach(function(d) {
+      d.isNumberVisible = true;
+    })
+    repaint();
+  }
+})
+svg
+.on('mousemove', function () {
+    if (link_to_be_added) {
+      var mouse = d3.mouse(this)
+      link_to_be_added.target.x = mouse[0]
+      link_to_be_added.target.y = mouse[1]
+    }
+})
+.on('click', function () {
+  d3.event.preventDefault();
+    if (link_to_be_added) {
+      link_to_be_added.delete();
+      dataHandler.removeFigure(link_to_be_added);
+      link_to_be_added = null;
+    }
+});
+
+var background = svg
+
+
+console.log(g)
+
+d3.select("body").on('keydown', function() {
+  
+  if ((event.ctrlKey || event.metaKey) && event.key==="c") {
+    console.log("copy");
+  }
+  else if ((event.ctrlKey || event.metaKey) && event.key==="v") {
+    console.log("paste");
+  }
+  else if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key==="z") {
+    console.log("redo");
+    dataHandler.redo();
+  }
+  else if ((event.ctrlKey || event.metaKey) && event.key==="z") {
+    console.log("undo");
+    dataHandler.undo(); 
+  }
+  else if (event.key === "x") {
+    if (dragged_node){
+      if (dragged_node.locked_to_tree) {
+        dataHandler.removeFigure(dragged_node.locked_to_tree)
+        dragged_node.locked_to_tree.delete();    
+      }
+        dataHandler.removeFigure(dragged_node)
+        dragged_node.delete();
+
+      repaint();
+    }
+  }
+});
+
+//var start_transform = g.attr("transform", "translate(500, 500)");
+//svg.call(zoom, d3.zoomIdentity.translate(100, 50).scale(2));
+
+//svg.on("click", d => {console.log("heyy bortha"); svg.style("cursor", "grab")})
+//svg.on("mouseup", d => svg.style("cursor", "grab"))
+
+function loadFile(filePath) {
+  var result = null;
+  var xmlhttp = new XMLHttpRequest();
+  xmlhttp.open("GET", filePath, false);
+  xmlhttp.send();
+  if (xmlhttp.status==200) {
+    result = xmlhttp.responseText;
+  }
+  return result;
+}
+
+var user_code = loadFile("insert.js")
+var insert_method = convertInputToCode(user_code);
+
+
+
+svg.call(zoom, d3.zoomIdentity.translate(100, 50).scale(2));
+function zoomed() {
+    g.attr("transform", d3.event.transform);
+    //svg.style("cursor", "grabbing"); 
+  }
+
+var drag_pos;
+
+
+function dragged(d) {
+  d3.select(this).style("cursor", "grabbing")
+  if (!drag_pos) drag_pos = [d3.event.x, d3.event.y]
+  if (this.className.baseVal === "array") { // check if dragging array
+    d3.select(this).data()[0].setTransform(d3.event.x, d3.event.y) //then call array method for updating postion
+    return;
+  }
+  if (this.className.baseVal === "BST") { // check if dragging bst
+    d3.select(this).data()[0].setTransform(d3.event.x, d3.event.y) 
+    return;
+  }
+  
+  if (dragged_node) 
+  {
+    var tree = dragged_node.locked_to_tree;
+    if (tree) {
+      if (tree.root === dragged_node) {
+        tree.setTransform(d3.event.x, d3.event.y)
+      }
+      // check if node being dragged is nearby placeholder nodes.
+      
+    }
+    if (!dragged_node.isPlaceholder){
+    d3.selectAll("circle").filter(d => d.isPlaceholder).attr("fill", "white");
+      dataHandler.getAllFiguresOfClass("Circle").some(function(n, i) { // check if there is a nearby node where aciton can be performed.
+        if(!n.isPlaceholder) return false;
+        if (d === n) return false;
+        var dst = Math.sqrt((d.x - n.x) * (d.x - n.x) + (d.y - n.y) * (d.y - n.y))
+        if (d !== n && dst < (d.radius + n.radius)){ 
+          if (d.locked_to_tree !== n.locked_to_tree && n.locked_to_tree.allowAddingChildToPlaceholder) {
+            const circle = d3.selectAll("circle").filter(function(c) { return c === n});
+            
+            circle.attr("fill", "#228B22")
+            // do something
+            return true;
+          }
+        }
+      })
+    }
+    if (dragged_node.hovering_grid) return; // if node locked to grid
+  }
+  
+  d3.selectAll("line").attr("pointer-events", "none") // remove hovering from all lines 
+  d.fx = d3.event.x;
+  d.fy = d3.event.y;
+  d3.select(this).attr("pointer-events", "none")
+  
+  d3.selectAll(".circle").filter(c => c !== d).attr("pointer-events", "none") // remove hovering from all nodes except d 
+  
+
+  dragged_node = d
+}
+
+function dragended(d) {
+  if (!d) {
+    d3.selectAll("line").attr("pointer-events", "auto")
+    d3.selectAll(".circle").attr("pointer-events", "auto")
+    dragged_node = null;
+    return;
+  }
+  d3.select(this).style("cursor", "pointer")
+  var distance_dragged = Math.sqrt(Math.pow((d3.event.x - d.startX), 2) + Math.pow((d3.event.y - d.startY), 2))
+ 
+   if (distance_dragged < 20) { // short drag, do nothing
+    if (dragged_node && !dragged_node.locked_grid){
+      d.fx = undefined;
+      d.fy = undefined; 
+    }
+    console.log(d)
+    
+    dragged_node = null;
+    d3.selectAll("circle").filter(d => d.isPlaceholder).attr("fill", "white");
+    d3.selectAll("line").attr("pointer-events", "auto")
+    d3.selectAll(".circle").attr("pointer-events", "auto")
+    d.click(d);
+    return;   
+  } 
+  
+  d3.select(this).attr("pointer-events", "auto")
+
+  if (dragged_node) { // are we dragging a node
+
+    var cell = d3.selectAll(".arraycell").data().filter(d => d.mouseOver)[0] // select array cell where mouse is hovering over
+    
+    if (cell) { // is mouse hovering over an arraycell
+      if (!cell.locked_node) {
+        if (d.locked_grid) d.locked_grid.removeCircle();
+        cell.addCircle(d, true);
+      }
+      else if (cell.locked_node === d) {
+        // do nothing
+      } 
+      else if (cell.locked_node !== d) {
+        if (d.locked_grid) d.locked_grid.removeCircle();
+        cell.removeCircle();
+        cell.addCircle(d, true);
+      } 
+    }
+    else {
+      if (d.locked_grid) {
+          d.locked_grid.removeCircle(); 
+      }
+        d.fx = undefined;
+        d.fy = undefined;
+    } 
+    if (!dragged_node.isPlaceholder){
+    dataHandler.getAllFiguresOfClass("Circle").filter(d => d.isPlaceholder).some(function(n, i) { // check if there is a nearby node where aciton can be performed.
+        
+        if (d === n) return false;
+        var dst = Math.sqrt((d.x - n.x) * (d.x - n.x) + (d.y - n.y) * (d.y - n.y))
+        if (d !== n && dst < (d.radius + n.radius)){ 
+          if (d.locked_to_tree !== n.locked_to_tree && n.locked_to_tree.allowAddingChildToPlaceholder) {
+            const circle = d3.selectAll("circle").filter(function(c) { return c === n});
+            var bst = n.locked_to_tree
+            // should handle this with in bst instead
+            if (bst.root.isPlaceholder) {
+              bst.addChild(d, n)
+            } 
+            else {
+              var index = n.parent.children.indexOf(n)
+              bst.addChild(d, n.parent, index)
+              console.log(n.locked_to_tree)
+            }
+            dataHandler.isSuccess();
+            repaint();  
+            return true;
+            // do something
+          }
+        }
+      })
+    }
+  }if (d) { d.setTransform(d3.event.x, d3.event.y) }
+  d3.selectAll("line").attr("pointer-events", "auto")
+  d3.selectAll(".circle").attr("pointer-events", "auto")
+  dragged_node = null;
+}
+
+
+
+//END: events
+
+
+
+
+
+//START: Helper methods
+function generateNodes(n, random, range){
+  if (!range) range = n;
+  var nodes = [];
+  for (var i = 0; i < n; i++) {
+    var val = Math.round(Math.random()*range)
+    if (nodes.some(d => d.value === val) && random) continue;
+    var pos = dataHandler.createRandomPointOnCircumference([0, 0], 1)
+    nodes.push(new Circle(random ? val : i, dataHandler.circle_count++, pos[0], pos[1]));
+  }
+  return nodes;
+}
+
+function stopInteraction(){
+  d3.selectAll("circle").on("mouseover", function(d, i) {})
+  d3.selectAll("circle").on("mouseout", function(d, i) {})
+}
+
+function removeExcept(){
+  //Something isn't right
+}
+//END: Helper Methods
+
+
+
+repaint();
+
+
+var repaint_done = true
+
+function repaint() {
+  
+  repaint_done = false
+  dataHandler.drawableList
+      .filter(d => d.constructor.name === "BST" || d.constructor.name === "RedBlackBST" )
+      .forEach(function (bst) {
+        bst.updateLinks(0)
+      })
+  // redraw all figures
+  dataHandler.drawFigures();
+  //var treeData = treemap(bst.root);
+  
+  svg.lower()
+
+  node = svg.selectAll(".circle, .button")
+  texts = svg.selectAll(".circletext, .textnode, .buttontext, .textarea")
+  links = svg.selectAll(".default_link")
+  bst_links = svg.selectAll(".BST_line")
+  
+  array = svg.selectAll(".array")
+  
+
+
+  simulation.nodes(dataHandler.drawableList.filter(function(d) { return d.constructor.name === "Circle" }));
+
+  var links_list = []
+  /* var bst = dataHandler.drawableList
+      .filter(function(d) { return d.constructor.name === "BST" })
+      .forEach(function (d) {
+        d.links.forEach(d => links_list.push(d))
+      })
+  if (bst) simulation.force("link").links(links_list); */
+  
+  repaint_done = true
+}
+
+var camera_update_rate = 30
+var count = 0;
+function ticked(e) {
+
+   var k = 10 * this.alpha(); //distance to move bst links to divided by time since last frame
+   
+   dataHandler.drawableList
+      .filter(d => d.constructor.name === "BST")
+      .forEach(function (bst) {
+        bst.updateLinks(k)
+      })
+
+
+  node
+      .attr("cx", d => d.x)
+      .attr("cy", d => d.y);
+  texts
+    .attr("x", d => d.x)
+    .attr("y", d => d.y );
+  links
+    .attr("x1", d => d.source.x)
+    .attr("y1", d => d.source.y)
+    .attr("x2", d => d.target.x)
+    .attr("y2", d => d.target.y);
+  bst_links
+    .attr("x1", d => d.source.data.x)
+    .attr("y1", d => d.source.data.y)
+    .attr("x2", d => d.target.data.x)
+    .attr("y2", d => d.target.data.y);
+
+  array
+    .attr("x", d => d.x)
+    .attr("y", d => d.y)
+
+    count++;
+    if (count % camera_update_rate === 0 && camera.autoUpdate && repaint_done && !dragged_node) camera.updateAutoCamera()
+
+}
+
+
+</script>
