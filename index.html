@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<div>
+  <svg width="1400" height="800"> 
+    <defs>
+      <marker id="Triangle" viewBox="0 0 10 10" refX="0" refY="5" orient="auto">
+        <path d="M 0 0 L 10 5 L 0 10 z" style="fill: black; stroke: none;"/>
+      </marker>
+    </defs>
+  </svg>
+</div>
+<script src="https://d3js.org/d3.v5.min.js"></script>
+
+<script src="https://d3js.org/d3-ease.v1.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.18.1/highlight.min.js"></script>
+<!-- <script>hljs.getLanguage('javascript').k += ['left', 1];</script> -->
+<script src="Colors.js"></script>
+<script src="Circle.js"></script>
+<script src="Link.js"></script>
+<script src="cText.js"></script>
+<script src="cArray.js"></script>
+<script src="BST.js"></script>
+<script src="cButton.js"></script>
+<script src="DataHandler.js"></script>
+<script src="Logger.js"></script>
+<script src="LevelData.js"></script>
+<script src="Camera.js"></script>
+<script src="TextArea.js"></script>
+<script src="Albot.js"></script>
+<script src="AlbotData.js"></script>
+<script src="Roadmap.js"></script>
+<script src="AudioHandler.js"></script>
+<script src="Menu.js"></script>
+<script src="CircleManager.js"></script>
+<script src="ScissorTool.js"></script>
+<script src="helper_functions.js"></script>
+<script src="d3-context-menu.js"></script> // found in link: 
+
+<audio src="res/sounds/Idyllic.mp3" id="backgroundMusic" class="track" loop></audio>
+<audio src="res/sounds/levelComplete.mp3" id="levelCompleteSound" class="track"></audio>
+<audio src="res/sounds/select.mp3" id="selectSound" class="track"></audio>
+<audio src="res/sounds/wood1.mp3" id="selectSound1" class="track"></audio>
+<audio src="res/sounds/wood2.mp3" id="selectSound2" class="track"></audio>
+<audio src="res/sounds/wood3.mp3" id="selectSound3" class="track"></audio>
+<audio src="res/sounds/wood4.mp3" id="selectSound4" class="track"></audio>
+<audio src="res/sounds/wood5.mp3" id="selectSound5" class="track"></audio>
+<audio src="res/sounds/wood6.mp3" id="selectSound6" class="track"></audio>
+<audio src="res/sounds/wood7.mp3" id="selectSound7" class="track"></audio>
+<audio src="res/sounds/wood8.mp3" id="selectSound8" class="track"></audio>
+<audio src="res/sounds/wood9.mp3" id="selectSound9" class="track"></audio>
+<audio src="res/sounds/tear_newspaper1.mp3" id="selectSound7" class="track"></audio>
+<audio src="res/sounds/tear_newspaper2.mp3" id="selectSound8" class="track"></audio>
+<audio src="res/sounds/tear_newspaper3.mp3" id="selectSound9" class="track"></audio>
+<audio src="res/sounds/scissor_cut1.mp3" id="selectSound7" class="track"></audio>
+<audio src="res/sounds/scissor_cut2.mp3" id="selectSound8" class="track"></audio>
+<audio src="res/sounds/scissor_cut3.mp3" id="selectSound9" class="track"></audio>
+<script src="https://cdn.jsdelivr.net/npm/typeit@6.1.1/dist/typeit.min.js"></script>
+<link rel="stylesheet" href="styles/d3-context-menu.css" />
+<link rel="stylesheet" href="./styles/atom-one-light.css" />
+<link rel="stylesheet" href="./styles/input_range.css" />
+<script>
+  var timeout_time = 300;
+  //START: Init
+  //Create canvas and d3js simulations
+  var context_menu = [ 
+        {
+          title: 'Find',
+          action: async function(elm, d, i) {
+            var bst = d.locked_to_tree
+            var number = parseFloat(prompt("Find which value?", ));
+            //var node_to_find = dataHandler.getAllFiguresOfClass("Circle").filter(d => d.value == number)[0]
+
+            var res = await bst.public_find(number, bst.root, timeout_time)
+
+            if (res) res.highlighted = true
+            bst.updateLinks()
+            repaint()
+            if (res)res.highlighted = false
+
+            
+
+            
+            console.log(res)
+          }
+        },
+        {
+          title: 'Insert',
+          action: async function(elm, d, i) {
+            var number = prompt("Insert which value?", );
+            var node_to_insert = generateNodes(1,true, 20)[0]
+            node_to_insert.value =  parseFloat(number)
+            node_to_insert.isNumberVisible = true; node_to_insert.isRevealed = true; node_to_insert.color = "black"
+            circle_manager.add(node_to_insert)
+            var bst = d.locked_to_tree
+            
+            //await bst.public_insert(node_to_insert, bst.root, 500)
+            if (bst.RedBlackBST) { 
+              res = await bst.public_balanced_insert(node_to_insert, bst.root, timeout_time) 
+            }
+            else {
+              res = await bst.public_insert(node_to_insert, bst.root, timeout_time)
+            }
+
+
+            node_to_insert.cx = 0; node_to_insert.cy = 0
+            bst.updateLinks()
+            repaint()
+          }
+        },
+        {
+          title: 'Delete',
+          action: async function(elm, d, i) {
+            var bst = d.locked_to_tree
+            var number = parseFloat(prompt("Delete which value?", ));
+            var res;
+            /* var node_to_delete = dataHandler.getAllFiguresOfClass("Circle").filter(d => d.value == number)[0]
+            console.log("deleting " + node_to_delete.value) */
+            if (bst.RedBlackBST) res = await bst.public_balanced_delete(bst.root, number, timeout_time)
+            else res = await bst.public_delete(bst.root, number, timeout_time)
+            
+            res = circle_manager.circles.filter(d => d.value == number)[0]
+            console.log(res)
+            if (res.locked_to_tree == bst) 
+            {
+              res.children.filter(d => d.isPlaceholder).forEach(d => {circle_manager.remove(d)})
+              res.locked_to_tree = null
+            }
+            bst.updateLinks()
+            repaint()
+          }
+        },
+        {
+            // divider
+            divider: true
+        },
+        
+                    {
+                        // header
+                        title: 'Reveal all',
+                        action: (elm, d, i) => {
+                          var bst = d.locked_to_tree
+                          bst.d3tree.descendants().map(d => d.data).forEach(d => {
+                            d.isNumberVisible = true;
+                            d.isRevealed = true;
+                            d.isInteractable = true;
+                          })
+                          repaint()
+                        } 
+                    },
+                    {
+                        // normal
+                        title: 'Hide all',
+                        action: (elm, d, i) => {
+                          var bst = d.locked_to_tree
+                          bst.d3tree.descendants().map(d => d.data).forEach(d => {
+                            d.isNumberVisible = false;
+                            d.isRevealed = false;
+                            d.isInteractable = false;
+                          })
+                          repaint()
+                        } 
+                    }
+                
+            
+      ]
+
+  var convertInputToCode = str => {
+    str = str.replace(/insert/g, "await insert_custom"); 
+
+    var lines = str.split("\n");
+    lines.splice(0, 1);
+    str = lines.join("\n");
+    var all =
+      "var temp = this\n"+
+      "var insert_custom = async function(node, h, callback) {\n" +
+      "if (temp.deleted) return \n" +
+      "if (temp.use_op && h != null) dataHandler.addOp({ str: \"insert(\"+ h.name + \", \" + node.value + \")\" }) \n" +
+      "await bst.animate(true, h, 200);\n" +
+      str +
+      "\n" +
+      "var foo = async () => { bst.root =  await insert_custom(node, root) \n return bst.root }\n" +
+      "foo()"
+    
+
+    return all;
+  };
+
+
+  var clickedExecuteCode = () => {
+    var textarea = d3.selectAll(".textarea").data()[0];
+
+    user_code = textarea.getText();
+
+    console.log(user_code.split("\n"))
+    insert_method = convertInputToCode(user_code);
+
+
+    dataHandler.restartLevel();
+
+    /* var bst = dataHandler.getAllFiguresOfClass("BST")[0];
+    dataHandler.isSuccess(bst.root, bst); */
+  };
+
+  var changeTextArea = t => {
+    console.log(t);
+  };
+
+  var redrawTimeout;
+  var redraw = function () {
+    width = window.innerWidth;
+    height = window.innerHeight;
+    svg.attr("width", width).attr("height", height - 4);
+    
+    if (redrawTimeout) {
+      window.clearTimeout(redrawTimeout)
+    }
+    redrawTimeout = setTimeout(() => {
+      console.log(width)
+      repaint()
+    }, 1000)
+    
+  };
+  window.addEventListener("resize", redraw);
+
+  d3.select("div").style("margin", "-8px -8px -8px -8px");
+  const svg = d3.select("svg").style("position", "absolute");
+
+  svg
+    .append("filter")
+    .attr("id", "blur")
+    .append("feGaussianBlur")
+    .attr("stdDeviation", 5);
+  
+  var bg_colors = 
+  [
+    "#FFFFFF",
+    "#F5F5F5",
+    "#FFFAFA",
+    "#F0FFF0",
+    "#F5FFFA",
+    "#F0FFFF",
+    "#F0F8FF",
+    "#F8F8FF",
+    "#FFF5EE",
+    "#F5F5DC",
+    "#FDF5E6",
+    "#FFFAF0",
+    "#FFFFF0",
+    "#FAEBD7",
+    "#FAF0E6",
+    "#FFF0F5"
+  ]
+
+  svg.style("background", "#FFFFF0")
+
+  var width = window.innerWidth;
+  var height = window.innerHeight;
+  svg.attr("width", width).attr("height", height - 4);
+
+  var map = new Roadmap();
+  
+  var defaultRadius = 40;
+  var nodes = [];
+  var transition_on = false;
+
+  const simulation = d3
+    .forceSimulation(nodes)
+    .force(
+      "charge",
+      d3
+        .forceManyBody()
+        .strength(function (d) {
+          //if (d.locked_to_tree) return 0;
+          if (d.isPlaceholder) return 0;
+          return defaultRadius * -8;
+        })
+        .distanceMin(10)
+    )
+
+    .force(
+      "x",
+      d3
+        .forceX()
+        .x(function (d) {
+          return d.cx;
+        })
+        .strength(0.1)
+    )
+    .force(
+      "y",
+      d3
+        .forceY()
+        .y(function (d) {
+          return d.cy;
+        })
+        .strength(0.1)
+    )
+    .force(
+      "link",
+      d3
+        .forceLink(links)
+        .distance(10)
+        .strength(1)
+    )
+    .force(
+      "collision",
+      d3.forceCollide().radius(function (d) {
+        if (d === dragged_node) return 0;
+        if (d.isPlaceholder) return 0;
+        if (d.noCollision) return 0;
+        else return defaultRadius;
+      })
+    )
+    .alphaTarget(0.5)
+    .on("tick", ticked)
+
+
+  var g = svg
+    .append("g")
+    .attr("transform", "translate(" + width / 2 + "," + height / 2 + ")");
+  var node;
+  var texts = g.append("div").selectAll(".text");
+  var links;
+  var array_cells;
+  var arrays;
+  var dragged_node;
+  var camera = new Camera();
+  //END: Init
+
+  
+  
+  var zoom = d3
+    .zoom()
+    .extent([
+      [0, 0],
+      [width, height]
+    ])
+    .scaleExtent([0.3, 3])
+    .on("zoom", zoomed);
+
+  var g = svg.append("g").attr("class", "everything");
+
+  // START: create initial data
+
+  const dataHandler = new DataHandler();
+  dataHandler.level_state = 0;
+  let audioHandler = new AudioHandler();
+  setTimeout(() => {
+    dataHandler.createData();
+  }, 0);
+  var circle_manager = new CircleManager();
+  
+  var menu = new Menu();
+  dataHandler.addFigure(menu)
+  /*
+var arr_button = new cButton("Array", 50, height * 0.96, makeArray);
+var cir_button = new cButton("Circle", 150, height * 0.96, makeCircle);
+var bst_button = new cButton("BST", 250, height * 0.96, makeBST);
+
+
+
+dataHandler.drawableList.push(arr_button)
+dataHandler.drawableList.push(cir_button)
+dataHandler.drawableList.push(bst_button) */
+
+function fromScreenPointToWorldPoint(x, y)
+{
+  function getScreenCoords(x, y, translate, scale) {
+                var xn = -translate[0]/scale + x/scale;
+                var yn = -translate[1]/scale + y/scale;
+                return { x: xn, y: yn };
+  }
+
+  if (previousTransform) {
+    var coords = getScreenCoords(x, y, [previousTransform.x, previousTransform.y], previousTransform.k);
+
+    return coords  
+  }
+  return {x: x, x: y}
+}
+
+
+var previous_line_position;
+
+  //var operations = new cText(() => { return "Operations: " + op }, 50, height * 0.9)
+  //dataHandler.drawableList.push(operations)
+
+  // END: create initial data
+
+  var link_to_be_added;
+
+  //START: events
+  svg
+    .on("mousemove", function () {
+      if (link_to_be_added) {
+        var mouse = d3.mouse(this);
+        link_to_be_added.target.x = mouse[0];
+        link_to_be_added.target.y = mouse[1];
+      }
+    })
+    .on("click", function (d) {
+      d3.event.preventDefault();
+      /* if (link_to_be_added) {
+        link_to_be_added.delete();
+        dataHandler.removeFigure(link_to_be_added);
+        link_to_be_added = null;
+      } */
+      console.log(d3.event)
+      if (map.visible && (d3.event.target.nodeName == "svg" || d3.event.target.nodeName == "circle")) {
+        //map.switch()
+      }
+    })
+    
+    
+    /* .on("dblclick", d => {
+      console.log("hey")
+      d3.event.preventDefault();
+      var cir = generateNodes(1, true, 50)[0]
+      cir.x = d3.event.x
+      cir.y = d3.event.y
+      circle_manager.add(cir)
+      this.repaint()
+    }) */
+
+  var background = svg;
+
+  
+
+  d3.select("body").on("keydown", function () {
+    if ((event.ctrlKey || event.metaKey) && event.key === "c") {
+      if (document.activeElement.nodeName == "BODY") {
+      console.log("copy");
+      }
+    } else if ((event.ctrlKey || event.metaKey) && event.key === "v") {
+      if (document.activeElement.nodeName == "BODY") {
+      console.log("paste");
+      }
+    } else if (
+      (event.ctrlKey || event.metaKey) &&
+      event.shiftKey &&
+      event.key === "z"
+    ) {
+      console.log("redo");
+      dataHandler.redo();
+    } else if ((event.ctrlKey || event.metaKey) && event.key === "z") {
+      console.log("undo");
+      dataHandler.undo();
+    } else if (event.key === "x") {
+      if (dragged_node) {
+        if (dragged_node.locked_to_tree) {
+          dataHandler.removeFigure(dragged_node.locked_to_tree);
+          dragged_node.locked_to_tree.delete();
+        }
+        dataHandler.removeFigure(dragged_node);
+        dragged_node.delete();
+
+        repaint();
+      }
+    } else if (event.key == " ") {
+      if (document.activeElement.nodeName == "BODY") {
+        if (dataHandler.readyForNextLevel) { dataHandler.goToNextLevel(); return;}
+        else if (dataHandler.level_state === 0) { svg.transition().duration(500).style("background", bg_colors[Math.floor(Math.random() * bg_colors.length)]) } // easter egg
+        if (dataHandler.albot_speaking) { 
+          dataHandler.skip_dialogue = true; 
+          dataHandler.restartLevel(); 
+          dataHandler.skip_dialogue = false
+        }
+      }
+    } else if (event.key == "r") {
+      if (document.activeElement.nodeName == "BODY") {
+        camera.reFocus();
+      }
+    } else if (event.key == "Escape") {
+      if (document.activeElement.nodeName == "BODY") {
+        map.switch(); //turn off or on
+      }
+    } else if (event.key == "m") {
+      if (document.activeElement.nodeName == "BODY") {
+        this.background_music_playing = 
+        audioHandler.play("Idyllic") //turn off or on
+      }
+    } else if (event.key == "ArrowLeft") {
+      if (document.activeElement.nodeName == "BODY") {
+        //try to move to the left node
+        
+        var list = circle_manager.circles.filter(d => d.drawArrowToCircle)
+        var level = dataHandler.level_data.data[dataHandler.level_state];
+        if (list.length > 0) {
+          
+          var d = list[0]
+          if (!d.left) return;
+          if (level.subtype == "insert" || level.subtype == undefined || level.subtype == "find" || level.subtype == "delete" || level.subtype == "demonstration") {
+            console.log(d.left)
+            d.left.nodeClicked(d.left) //d.children[0].nodeClicked(d.children[0])
+          }
+        }
+      }
+    } else if (event.key == "ArrowRight") {
+      if (document.activeElement.nodeName == "BODY") {
+        var list = circle_manager.circles.filter(d => d.drawArrowToCircle)
+        var level = dataHandler.level_data.data[dataHandler.level_state];
+        if (list.length > 0) {
+          var d = list[0]
+          if (!d.right) return;
+          if (level.subtype == "insert" || level.subtype == undefined || level.subtype == "find" || level.subtype == "delete" || level.subtype == "demonstration") {
+            d.right.nodeClicked(d.right) //d.children[1].nodeClicked(d.children[1])
+          }
+        }
+      }
+    } else if (event.key == "ArrowUp") {
+      if (document.activeElement.nodeName == "BODY") {
+        var list = circle_manager.circles.filter(d => d.drawArrowToCircle)
+        var level = dataHandler.level_data.data[dataHandler.level_state];
+        if (list.length > 0) {
+          var d = list[0]
+          if (!d.parent) return;
+          if (level.subtype == "insert" || level.subtype == undefined || level.subtype == "find" || level.subtype == "delete" || level.subtype == "demonstration") {
+            d.parent.nodeClicked(d.parent)
+          }
+        }
+      }
+    }
+  });
+  //var start_transform = g.attr("transform", "translate(500, 500)");
+  //svg.call(zoom, d3.zoomIdentity.translate(100, 50).scale(2));
+
+  //svg.on("click", d => {console.log("heyy bortha"); svg.style("cursor", "grab")})
+  //svg.on("mouseup", d => svg.style("cursor", "grab"))
+
+  function loadFile(filePath) {
+    var result = null;
+    var xmlhttp = new XMLHttpRequest();
+    xmlhttp.open("GET", filePath, false);
+    xmlhttp.send();
+    if (xmlhttp.status == 200) {
+      result = xmlhttp.responseText;
+    }
+    return result;
+  }
+
+  
+  var scissor = new ScissorTool()
+
+
+  svg.call(zoom, d3.zoomIdentity.translate(100, 50).scale(2));
+
+
+  // used for creating the path when the user is dragging on the screen
+  var line = g.append("path")
+                    .attr("d", [])
+                    //.attr("stroke", piyg(Math.random()))
+                    .attr("stroke-width", 15)
+                    //.attr("opacity", line_opacity)
+                    .attr("fill", "none")
+                    .attr("stroke-linecap", "round")
+
+  var previousTransform;
+  function zoomed() {
+   // if (d3.event.sourceEvent) return;
+   // if (d3.event.sourceEvent.constructor.name === "WheelEvent") 
+    g.attr("transform", d3.event.transform);
+
+    previousTransform = d3.event.transform
+
+    //svg.style("cursor", "grabbing");
+  }
+
+  var drag_pos;
+    
+
+    
+  function dragged(d) {
+    d3.select(this).style("cursor", "grabbing");
+    if (!drag_pos) drag_pos = [d3.event.x, d3.event.y];
+    if (this.className.baseVal === "array") {
+      // check if dragging array
+      d3.select(this)
+        .data()[0]
+        .setTransform(d3.event.x, d3.event.y); //then call array method for updating postion
+      return;
+    }
+    if (this.className.baseVal === "BST") {
+      // check if dragging bst
+      d3.select(this)
+        .data()[0]
+        .setTransform(d3.event.x, d3.event.y);
+      return;
+    }
+
+    if (dragged_node) {
+      var tree = dragged_node.locked_to_tree;
+      if (tree) {
+        /* console.log(tree.d3tree.descendants().filter(d => d.data === dragged_node)[0])
+      tree.d3tree.descendants().filter(d => d.data === dragged_node)[0].descendants().forEach(d => 
+      {
+        d.data.
+      }) */
+        if (tree.root === dragged_node) {
+          tree.setTransform(d3.event.x, d3.event.y);
+        }
+        // check if node being dragged is nearby placeholder nodes.
+
+        /* dragged_node.tree_x = d3.event.x
+      dragged_node.tree_y = d3.event.y */
+      }
+      if (!dragged_node.isPlaceholder) {
+        d3.selectAll("circle")
+          .filter(d => d.isPlaceholder)
+          .attr("fill", "white");
+          circle_manager.circles.some(function (n, i) {
+          // check if there is a nearby node where aciton can be performed.
+          if (!n.isPlaceholder) return false;
+          if (d === n) return false;
+          var dst = Math.sqrt(
+            (d.x - n.x) * (d.x - n.x) + (d.y - n.y) * (d.y - n.y)
+          );
+          if (d !== n && dst < d.radius + n.radius) {
+            if (
+              d.locked_to_tree !== n.locked_to_tree &&
+              n.locked_to_tree.allowAddingChildToPlaceholder
+            ) {
+              const circle = d3.selectAll("circle").filter(function (c) {
+                return c === n;
+              });
+
+              circle.attr("fill", "#228B22");
+              // do something
+              return true;
+            }
+
+            //repaint();
+            return true;
+            // do something
+          }
+        });
+      }
+      if (dragged_node.hovering_grid) return; // if node locked to grid
+    }
+
+    d3.selectAll("line").attr("pointer-events", "none"); // remove hovering from all lines
+    d.fx = d3.event.x;
+    d.fy = d3.event.y;
+    d3.select(this).attr("pointer-events", "none");
+
+    d3.selectAll(".circle")
+      .filter(c => c !== d)
+      .attr("pointer-events", "none"); // remove hovering from all nodes except d
+
+    dragged_node = d;
+  }
+
+  function dragended(d) {
+    if (!d) {
+      d3.selectAll("line").attr("pointer-events", "auto");
+      d3.selectAll(".circle").attr("pointer-events", "auto");
+      dragged_node = null;
+      return;
+    }
+    d3.select(this).style("cursor", "pointer");
+    var distance_dragged = Math.sqrt(
+      Math.pow(d3.event.x - d.startX, 2) + Math.pow(d3.event.y - d.startY, 2)
+    );
+
+    if (distance_dragged < 20) {
+      // short drag, do nothing
+      if (dragged_node && !dragged_node.locked_grid) {
+        d.fx = undefined;
+        d.fy = undefined;
+      }
+
+      dragged_node = null;
+      d3.selectAll("circle")
+        .filter(d => d.isPlaceholder)
+        .attr("fill", "white");
+      d3.selectAll("line").attr("pointer-events", "auto");
+      d3.selectAll(".circle").attr("pointer-events", "auto");
+      d.click(d);
+      return;
+    }
+
+    d3.select(this).attr("pointer-events", "auto");
+
+    if (dragged_node) {
+      // are we dragging a node
+      if (dragged_node.locked_to_tree) {
+        var tree = dragged_node.locked_to_tree;
+        var tree_node = tree.d3tree.descendants().filter(n => n.data === d)[0];
+
+
+        /* dragged_node.tree_x  = d3.event.x
+      dragged_node.tree_y  = d3.event.y  */
+        tree_node
+          .descendants()
+          .filter(d => d.data != dragged_node)
+          .forEach(d => {
+            //d.data.tree_x = d3.event.x + d.data.tree_x - dragged_node.tree_x
+            d.data.tree_y = d3.event.y + d.data.tree_y - dragged_node.tree_y;
+          });
+        //dragged_node.tree_x  = d3.event.x
+        dragged_node.tree_y = d3.event.y;
+      }
+      var cell = d3
+        .selectAll(".arraycell")
+        .data()
+        .filter(d => d.mouseOver)[0]; // select array cell where mouse is hovering over
+
+      if (cell) {
+        // is mouse hovering over an arraycell
+        if (!cell.locked_node) {
+          if (d.locked_grid) d.locked_grid.removeCircle();
+          cell.addCircle(d, true);
+        } else if (cell.locked_node === d) {
+          // do nothing
+        } else if (cell.locked_node !== d) {
+          if (d.locked_grid) d.locked_grid.removeCircle();
+          cell.removeCircle();
+          cell.addCircle(d, true);
+        }
+      } else {
+        if (d.locked_grid) {
+          d.locked_grid.removeCircle();
+        }
+        d.fx = undefined;
+        d.fy = undefined;
+      }
+      if (!dragged_node.isPlaceholder) {
+        dataHandler
+          .getAllFiguresOfClass("Circle")
+          .filter(d => d.isPlaceholder)
+          .some(function (n, i) {
+            // check if there is a nearby node where aciton can be performed.
+
+            if (d === n) return false;
+            var dst = Math.sqrt(
+              (d.x - n.x) * (d.x - n.x) + (d.y - n.y) * (d.y - n.y)
+            );
+            if (d !== n && dst < d.radius + n.radius) {
+              if (
+                d.locked_to_tree !== n.locked_to_tree &&
+                n.locked_to_tree.allowAddingChildToPlaceholder
+              ) {
+                const circle = d3.selectAll("circle").filter(function (c) {
+                  return c === n;
+                });
+                var bst = n.locked_to_tree;
+                // should handle this with in bst instead
+                if (bst.root.isPlaceholder) {
+                  bst.addChild(d, n);
+                } else {
+                  var index = n.parent.children.indexOf(n);
+                  bst.addChild(d, n.parent, index);
+                }
+
+                if (bst.node_to_insert)
+                  dataHandler.isSuccess(bst.node_to_insert, bst);
+                else dataHandler.isSuccess(d, bst);
+                repaint();
+                return true;
+                // do something
+              }
+            }
+          });
+      }
+    }
+    if (d) {
+      d.setTransform(d3.event.x, d3.event.y);
+    }
+    d3.selectAll("line").attr("pointer-events", "auto");
+    d3.selectAll(".circle").attr("pointer-events", "auto");
+    dragged_node = null;
+  }
+
+  //END: events
+
+  //START: Helper methods
+  function generateNodes(n, random, range) {
+    if (!range) range = n;
+    var nodes = [];
+    for (var i = 0; i < n; i++) {
+      var val = Math.round(Math.random() * range);
+      if (nodes.some(d => d.value === val) && random) continue;
+      var pos = dataHandler.createRandomPointOnCircumference([0, 0], 1);
+      nodes.push(
+        new Circle(
+          random ? val : i,
+          circle_manager.max_id++,
+          pos[0] + width / 2,
+          pos[1] + height / 2
+        )
+      );
+    }
+    return nodes;
+  }
+
+  function stopInteraction() {
+    d3.selectAll("circle").on("mouseover", function (d, i) { });
+    d3.selectAll("circle").on("mouseout", function (d, i) { });
+  }
+
+    
+  //END: Helper Methods
+
+  var fps = new cText("FPS", width * 0.95, height * 0.95)
+
+  var t0 = Date.now(), t1;
+
+  repaint();
+
+  var repaint_done = true;
+
+  function repaint() {
+    //if (!repaint_done) return;
+    
+    repaint_done = false;
+    simulation.alphaTarget(0.5)
+    /* dataHandler.drawableList
+      .filter(d => d.constructor.name === "BST" || d.constructor.name === "RedBlackBST")
+      .forEach(function (bst) {
+        bst.updateLinks()
+      }) */
+    // redraw all figures
+    dataHandler.drawFigures();
+    circle_manager.draw()
+    //var treeData = treemap(bst.root);
+    
+    svg.lower();
+    fps.draw()
+
+    /* var existing_circles = dataHandler.getAllFiguresOfClass("Circle").filter(d => d.isPlaceholder)
+  d3.selectAll(".circle").data().filter(d => d.isPlaceholder).filter(d => {
+    return existing_circles.indexOf(d) < 0
+  }).forEach(d => {d.delete(); console.log("deleted")}) */
+    /* console.log(d3.selectAll(".circle").data().filter(d => d.isPlaceholder))
+  console.log(dataHandler.getAllFiguresOfClass("Circle").filter(d => d.isPlaceholder))
+ */
+
+    var existing_circles = circle_manager.circles
+  
+    existing_circles.forEach(d => {
+      if (d.locked_to_tree) {
+        if (!d.parent) return;
+        if (!d.parent.children || !d.parent.children.includes(d)) {
+          if (d.locked_to_tree.root === d) return;
+          if (d.parent.left == d || d.parent.right == d) return;
+          if (d.isPlaceholder) {
+            circle_manager.remove(d)
+          } 
+          d.locked_to_tree = undefined;
+          if (d.children) {
+            d.children.forEach(d => {
+              circle_manager.remove(d)
+            })
+          }
+        }
+      }
+    })
+
+    node = svg.selectAll(".circle, .button");
+
+    texts = svg.selectAll(".circlenames, .circlevalues, .rootnames, .textnode, .buttontext, .textarea");
+    links = svg.selectAll(".default_link");
+    arrows = svg.selectAll(".circlearrow");
+    bst_links = svg.selectAll(".BST_line");
+    arrays = svg.selectAll(".array");
+
+
+    
+    //simulation.stop()
+
+    
+
+
+    /* var links_list = [];
+     var bst = dataHandler.drawableList
+      .filter(function(d) { return d.constructor.name === "BST" })
+      .forEach(function (d) {
+        d.links.forEach(d => links_list.push(d))
+      })
+  if (bst) simulation.force("link").links(links_list); 
+    simulation.force("link").links() */
+    
+    repaint_done = true;
+  }
+  //setInterval(function(){simulation.alpha(0.5);},250);
+  var camera_update_rate = 30;
+  var count = 0;
+  function ticked(e) {
+    /* for (let i = 0; i < 5; i++) {
+      simulation.tick();
+    } */
+    t1 = Date.now();
+    if (count % 5 == 0) {
+      fps.text_ele.text("FPS: " + Math.round(1000 / (t1-t0)));
+    }
+    t0 = t1;
+
+    var k = 10 * this.alpha(); //distance to move bst links to divided by time since last frame
+
+    dataHandler.drawableList
+      .filter(
+        d =>
+          d.constructor.name === "BST" || d.constructor.name === "RedBlackBST"
+      )
+      .forEach(function (bst) {
+        bst.updateTreeNodePositions();
+      });
+
+
+    node.attr("cx", d => d.x).attr("cy", d => d.y);
+
+    texts.attr("x", d => d.x).attr("y", d => d.y);
+    links
+      .attr("x1", d => d.source.x)
+      .attr("y1", d => d.source.y)
+      .attr("x2", d => d.target.x)
+      .attr("y2", d => d.target.y);
+    bst_links
+      .attr("x1", d => d.source.data.x)
+      .attr("y1", d => d.source.data.y)
+      .attr("x2", d => d.target.data.x)
+      .attr("y2", d => d.target.data.y);
+
+    arrows
+      .attr("x1",d => d.x)  
+      .attr("y1",d => d.y - 150)  
+      .attr("x2",d => d.x)  
+      .attr("y2",d => d.y - 100)  
+
+    arrays.attr("x", d => d.x).attr("y", d => d.y);
+
+    count++;
+    /* 
+    if (count % camera_update_rate === 0 && camera.autoUpdate && repaint_done && !dragged_node) camera.updateAutoCamera()
+ */
+  }
+</script>
