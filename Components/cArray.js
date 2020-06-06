@@ -1,6 +1,6 @@
 import { dragged, dragended, draggedNode } from "../Handlers/EventHandler.js"
 import { repaint } from "../Handlers/SimulationHandler.js"
-
+import { arrayContextMenu } from '../Components/ContextMenu.js'
 import { getRandomColorScheme } from "../Utilities/Colors.js"
 
 export class cArray {
@@ -14,10 +14,10 @@ export class cArray {
     this.z = -2
     this.color = 'gainsboro'
     this.static = false
-    this.makeGrid()
+    this.makeGrid(this.size)
     this.descriptor = descriptor
     this.name = 'a'
-    this.g = d3.select('g')
+    this.g = d3.select('.everything')
     this.colorScheme = getRandomColorScheme()
   }
 
@@ -57,10 +57,71 @@ export class cArray {
     }
   }
 
-  makeGrid () {
+  getNextCircleInArray(i) {
+    if (i === this.array_data.length) return null;
+    if (this.array_data[i].locked_node) return this.array_data[i].locked_node
+    else this.getNextCircleInArray(i+1)
+  }
+
+  fillArray() {
+   var previous; 
+    this.array_data.forEach((d, i) => {
+      if (!d.locked_node) return;
+
+      var c = window.circleManager.add()
+      var next =  this.getNextCircleInArray(i+1)
+      if (previous) {
+        if (!next) {
+          c.value = Math.floor(Math.random()*20) + previous.value
+        }else {
+          c.value = Math.floor(Math.random(next.value - previous.value))
+        }
+      }
+      d.addCircle(c, false)
+      previous = c;
+    })
+    repaint()
+  }
+
+  async publicFindNumber(number) {
+    await this.findNumber(number, 0, this.array_data.length)
+  }
+
+  async findNumber(number, lower, upper) {
+    
+    var middle = Math.floor((lower + upper)/2); 
+    var c = this.array_data[middle].locked_node
+    if (!c) return;
+    c.drawArrowToCircle = true
+    c.isRevealed = true; c.isNumberVisible = true;
+    repaint()
+    window.audioHandler.play("key7")
+    await new Promise(resolve => setTimeout(resolve, timeoutTime))
+    c.drawArrowToCircle = false;
+    c.isRevealed = false; c.isNumberVisible = false;
+    
+    if (c.value === number) {
+      c.highlighted = true; c.isRevealed = true; c.isNumberVisible = true;
+      repaint()
+      await new Promise(resolve => setTimeout(resolve, timeoutTime))
+      c.highlighted = false; c.isRevealed = false; c.isNumberVisible = false;
+      return true;
+    }
+    else if (c.value > number) {
+      this.findNumber(number, lower, middle-1)
+    }
+    else if (c.value < number) {
+      this.findNumber(number, middle+1, upper)
+    }
+  
+  
+  }
+
+  makeGrid (count) {
     var temp = this
-    var xpos = 0
-    for (var column = 0; column < this.size; column++) {
+    var xpos = (this.cell_width + this.cell_width / 20) * this.array_data.length
+    var new_size = this.array_data.length + count
+    for (var column = this.array_data.length; column < new_size; column++) {
       this.array_data.push({
         x: xpos,
         y: 0,
@@ -111,6 +172,25 @@ export class cArray {
     }
   }
 
+  setLength(length) {
+    this.size = length
+
+    if (length < this.array_data.length) {
+      for (var i = length ; i < this.array_data.length; i++)
+      {
+        if (!this.array_data[i].locked_node) continue;
+        var c = this.array_data[i].locked_node
+        c.fx = null; c.fy = null
+      }
+      this.array_data = this.array_data.splice(0, length)
+    }
+    else {
+      this.makeGrid(length - this.array_data.length) 
+    }
+    console.log(this.array_data)
+
+  }
+
   setTransform (x, y) {
     this.x = x
     this.y = y
@@ -147,8 +227,9 @@ export class cArray {
       .selectAll('.arraycell')
       .data(this.array_data)
       .join('g')
+      .on('contextmenu', d3.contextMenu(arrayContextMenu))
 
-    cells.append('text')
+      cells.append('text')
       .attr('class', 'arraytext')
       .attr('dx', function (d) { return d.x + temp.cell_width / 2 })
       .attr('dy', 125)
@@ -156,8 +237,8 @@ export class cArray {
       .attr('font-size', 25)// font size
       .style('text-anchor', 'middle')
       .attr('pointer-events', 'none')
-
-    cells.append('rect')
+      
+      var rects = cells.append('rect')
       .attr('class', 'arraycell')
       .attr('x', function (d) { return d.x })
       .attr('y', function (d) { return d.y })
@@ -170,12 +251,12 @@ export class cArray {
       .style('stroke-width', 5)
       .on('mouseover', function (d) {
         d.mouseOver = true
-
+        
         // if dragging node and cell not holding node, then attach it to array cell
         if (!draggedNode) return
-
+        
         draggedNode.hovering_grid = d
-
+        
         d.hovering_node = draggedNode
         draggedNode.fx = temp.x + d.x + d.width / 2
         draggedNode.fy = d.height / 2 + temp.y
@@ -183,14 +264,14 @@ export class cArray {
       })
       .on('mouseout', function (d) {
         d.mouseOver = false
-
+        
         if (!draggedNode) return
         if (d.hovering_node !== d.locked_node) d.hovering_node = d.locked_node
         else d.hovering_node = undefined
-
+        
         draggedNode.hovering_grid = null
       })
       .transition().duration(500).style('opacity', 0.5)
-    cells.lower()
+      cells.lower()
+    }
   }
-}

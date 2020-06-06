@@ -32,7 +32,8 @@ export class Circle {
   }
 
   click (d) {
-    window.audioHandler.play("key4")
+    var rand = Math.floor(Math.random() * 13 + 1)
+    audioHandler.play('key' + rand)
     d.nodeClicked(d)
   }
 

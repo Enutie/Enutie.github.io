@@ -14,7 +14,7 @@ export class cText {
     }
     this.relativePosition = relativePosition
     this.svg = d3.select('svg')
-    this.g = d3.select('g')
+    this.g = d3.select('.everything')
   }
 
   delete () {

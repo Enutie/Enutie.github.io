@@ -31,6 +31,13 @@ body {
 	
 	background: #fff;
 }
+
+button {
+	font-family: 'Walter Turncoat', Calibri, Arial, sans-serif;
+	
+	background: #fff;
+	
+}
 /* h1, .textline {
 	font-family: 'Roboto', Calibri, Arial, sans-serif;
 	

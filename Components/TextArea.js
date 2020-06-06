@@ -73,6 +73,8 @@ export class TextArea { // should be called codearea instead probably
     }
     var temp = this
 
+    if (this.textarea) this.textarea.remove()
+
     this.textarea = this.ele
       .selectAll('.textarea')
       .data(this.text_areas, d => d.id)
@@ -102,10 +104,11 @@ export class TextArea { // should be called codearea instead probably
    
     if (this.button) this.button.remove()
     this.button = this.ele.append('button')
-      .style('padding', '15px 32px')
-      .style('text-align', 'center')
+    .style('text-align', 'center')
+    
+      .attr('class', 'button btn btn-2 btn-2b')
+      .style("font-size", "16px")
       .text('Run code')
-      .classed('button', true)
       .attr('content', 'Execute')
       .on('click', () => temp.clickedExecuteCode())
 

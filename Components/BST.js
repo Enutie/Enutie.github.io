@@ -34,7 +34,7 @@ export class BST {
     this.allowAddingChildToPlaceholder = true
     this.linksCutable = true
     this.isLectureMode = true
-    this.g = d3.select('g')
+    this.g = d3.select('.everything')
     this.text = new cText(this.RedBlackBST ? "RB " : "" + "BST", 0, -150, 40, 0, true, this)
     dataHandler.addFigure(this.text)
     

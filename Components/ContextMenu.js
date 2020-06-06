@@ -199,3 +199,81 @@ export var circleContextMenu = function (d) {
   }
 }
 
+export var arrayContextMenu = function (d) {
+    return [
+      {
+        title: "Set size",
+        action: async function (elm, d, i) {
+          var number = prompt('Set value to')
+    
+          var parsed = parseFloat(number)
+    
+          if (isNaN(parsed)) parsed = 10
+          elm.parent.setLength(parsed)
+          repaint()
+        }
+      },
+      {
+        title: "Reveal all",
+        action: async function (elm, d, i) {
+    
+          elm.parent.array_data.filter(d => d.locked_node).forEach(d => {
+            d.locked_node.isNumberVisible = true; d.locked_node.isRevealed = true;
+          })
+          repaint()
+        }
+      },
+      // {
+      //   title: "Fill array",
+      //   action: async function (elm, d, i) {
+    
+      //     elm.parent.fillArray()
+      //     repaint()
+      //   }
+      // },
+      {
+        // divider
+        divider: true
+      },
+      {
+        title: "Insert",
+        action: async function (elm, d, i) {
+          var number = prompt('Set value to')
+          var arr = elm.parent
+    
+          var numbers = getAllNumbersInString(number)
+          var circles = circleManager.generateNodes(numbers.length, true, true, () => {}, true)
+
+          circles.forEach((d,i) => 
+            {
+              d.value = numbers[i]
+              d.isNumberVisible = true; d.isRevealed = true; 
+            } )
+        var queue = new CircleQueue(circles, arr)
+          await asyncForEach(circles, async function (d) {
+            await arr.addCircleToSortedArray(d)
+            queue.pop()
+            repaint()
+          })
+    
+        }
+      },
+      {
+        title: "Find",
+        action: async function (elm, d, i) {
+          var number = prompt('Set value to')
+          var arr = elm.parent
+    
+          var numbers = getAllNumbersInString(number)
+          arr.array_data.filter(d => d.locked_node).forEach(d => {
+            d.locked_node.isNumberVisible = false; d.locked_node.isRevealed = false;
+          })
+          await asyncForEach(numbers, async function (d) {
+            await arr.publicFindNumber(d)
+            repaint()
+          })
+    
+        }
+      }
+    ]
+}

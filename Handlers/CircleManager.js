@@ -30,7 +30,7 @@ export class CircleManager {
     if (Array.isArray(obj)) {
       obj.forEach(d => this.circles.push(d))
     } else {
-      if (!obj) obj = new Circle(50, this.max_id++, width / 2, width / 2)
+      if (!obj) obj = new Circle(this.generateRandomValue(), this.max_id++, 0, 0)
       this.circles.push(obj)
     }
     this.quadtree = d3.quadtree().x(d => d.x).y(d => d.y).addAll(this.circles)
@@ -39,6 +39,7 @@ export class CircleManager {
     var values = this.circles.filter(c => !c.isPlaceholder).map(c => c.value)
     setScheme(Math.min(...values), Math.max(...values))
     this.draw()
+    return obj
   }
 
   remove (obj) {
@@ -67,12 +68,17 @@ export class CircleManager {
     repaint()
   }
 
+  generateRandomValue(n) {
+    if (!n) n = 100
+    return parseFloat((Math.random() * n - n/2).toFixed(this.decimalsAllowed));
+  }
+
   generateNodes (n, random, range, onClicked, ignoreCircleCountFactor) {
     var factor = ignoreCircleCountFactor ? 1 : this.circleCountFactor
     if (!range) range = n * factor
     var nodes = []
     while(nodes.length < n * factor){
-      var r = parseFloat((Math.random() * n - n/2).toFixed(this.decimalsAllowed));
+      var r = this.generateRandomValue(n)
       if (nodes.some(d => d.value === r) && random) continue
       var pos = createRandomPointOnCircumference([0, 0], 1)
       nodes.push(
@@ -92,8 +98,15 @@ export class CircleManager {
   }
 
   
-  getRandomCircle() {
-    return this.circles[Math.floor(Math.random() * this.circles.length)]
+  getRandomCircle(bst) {
+    var randomCircles;
+
+    if (bst) {
+      randomCircles = circleManager.circles.filter(d => !d.isPlaceholder && d !== bst.root)
+    } else {
+      randomCircles = circleManager.circles.filter(d => !d.isPlaceholder)
+    }
+    return randomCircles[Math.floor(Math.random() * (randomCircles.length - 1))]
   }
 
   showAll() {

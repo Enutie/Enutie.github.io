@@ -24,11 +24,15 @@ export function setupKeyEvents () {
       }
     } else if ((event.ctrlKey || event.metaKey) && event.key === 'v') {
       if (document.activeElement.nodeName === 'CODE') {
-      //   d3.event.preventDefault()
-      //   navigator.clipboard.readText().then(text =>{
-      //     d3.select(document.activeElement).datum().text = text 
-      //     dataHandler.getAllFiguresOfClass("TextArea").forEach(d => d.draw())
-      // })
+        d3.event.preventDefault()
+        navigator.clipboard.readText().then(text =>{
+          console.log(text)
+
+          d3.select(document.activeElement).datum().text = text
+          console.log(d3.select(document.activeElement).datum())
+          
+          dataHandler.getAllFiguresOfClass("TextArea").forEach(d => d.draw())
+      })
       }
     } else if (
       (event.ctrlKey || event.metaKey) &&
@@ -95,9 +99,10 @@ export function setupKeyEvents () {
     }
     // easter egg : difficulty increase
     if (event.key === "+") {
-      if (circleManager.decimalsAllowed < 1) {
+      if (window.levelHandler.currentLevel.subtype === "Start Screen" && circleManager.decimalsAllowed < 1) {
         circleManager.decimalsAllowed++
         circleManager.circleCountFactor++
+        console.log("Hard mode enabled. Nice find!")
       }
     }
   })
@@ -283,7 +288,6 @@ export function dragended (d) {
                   d.locked_to_tree.setTransform(bst.x, bst.y)
                   window.dataHandler.removeFigure(bst)
                   d.locked_to_tree.RedBlackBST = bst.RedBlackBST
-                  console.log("hey")
                 } else {
               
                 

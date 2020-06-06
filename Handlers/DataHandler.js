@@ -40,8 +40,7 @@ export class DataHandler {
   }
 
   addOp(op) {
-    var rand = Math.floor(Math.random() * 13 + 1)
-    audioHandler.play('key' + rand)
+    
     this.operations += 1
     this.logger.addOp(op)
   }
